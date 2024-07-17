@@ -6,10 +6,13 @@ ARG IMAGE_BRANCH="${IMAGE_BRANCH:-main}"
 ARG SOURCE_IMAGE="${SOURCE_IMAGE:-$BASE_IMAGE_NAME-$BASE_IMAGE_FLAVOR}"
 ARG BASE_IMAGE="ghcr.io/ublue-os/${SOURCE_IMAGE}"
 ARG FEDORA_MAJOR_VERSION="${FEDORA_MAJOR_VERSION:-40}"
+ARG JUPITER_KERNEL_VERSION="${JUPITER_KERNEL_VERSION:-jupiter-20240605.1}"
+ARG SHA_HEAD_SHORT="${SHA_HEAD_SHORT}"
+ARG CODE_NAME="${CODE_NAME:-Holographic}"
 
-FROM ghcr.io/ublue-os/akmods:${KERNEL_FLAVOR}-${FEDORA_MAJOR_VERSION} AS akmods
-FROM ghcr.io/ublue-os/akmods-extra:${KERNEL_FLAVOR}-${FEDORA_MAJOR_VERSION} AS akmods-extra
-FROM ghcr.io/ublue-os/fsync-kernel:${FEDORA_MAJOR_VERSION} AS fsync
+FROM ghcr.io/ublue-os/akmods:${KERNEL_FLAVOR}-${FEDORA_MAJOR_VERSION}-20240716 AS akmods
+FROM ghcr.io/ublue-os/akmods-extra:${KERNEL_FLAVOR}-${FEDORA_MAJOR_VERSION}-20240716 AS akmods-extra
+FROM ghcr.io/ublue-os/fsync-kernel:${FEDORA_MAJOR_VERSION}-6.9.8 AS fsync
 
 FROM ${BASE_IMAGE}:${FEDORA_MAJOR_VERSION} AS bazzite
 
@@ -21,6 +24,8 @@ ARG IMAGE_BRANCH="${IMAGE_BRANCH:-main}"
 ARG BASE_IMAGE_NAME="${BASE_IMAGE_NAME:-kinoite}"
 ARG FEDORA_MAJOR_VERSION="${FEDORA_MAJOR_VERSION:-40}"
 ARG JUPITER_KERNEL_VERSION="${JUPITER_KERNEL_VERSION:-jupiter-20240605.1}"
+ARG SHA_HEAD_SHORT="${SHA_HEAD_SHORT}"
+ARG CODE_NAME="${CODE_NAME:-Holographic}"
 
 COPY system_files/desktop/shared system_files/desktop/${BASE_IMAGE_NAME} /
 
@@ -132,6 +137,7 @@ RUN curl -Lo /usr/bin/copr https://raw.githubusercontent.com/ublue-os/COPR-comma
     chmod +x /usr/bin/copr && \
     curl -Lo /etc/yum.repos.d/_copr_kylegospo-bazzite.repo https://copr.fedorainfracloud.org/coprs/kylegospo/bazzite/repo/fedora-"${FEDORA_MAJOR_VERSION}"/kylegospo-bazzite-fedora-"${FEDORA_MAJOR_VERSION}".repo && \
     curl -Lo /etc/yum.repos.d/_copr_kylegospo-bazzite-multilib.repo https://copr.fedorainfracloud.org/coprs/kylegospo/bazzite-multilib/repo/fedora-"${FEDORA_MAJOR_VERSION}"/kylegospo-bazzite-multilib-fedora-"${FEDORA_MAJOR_VERSION}".repo?arch=x86_64 && \
+    curl -Lo /etc/yum.repos.d/_copr_kylegospo-scx_lavd.repo https://copr.fedorainfracloud.org/coprs/kylegospo/scx_lavd/repo/fedora-"${FEDORA_MAJOR_VERSION}"/kylegospo-scx_lavd-fedora-"${FEDORA_MAJOR_VERSION}".repo && \
     curl -Lo /etc/yum.repos.d/_copr_ublue-os-staging.repo https://copr.fedorainfracloud.org/coprs/ublue-os/staging/repo/fedora-"${FEDORA_MAJOR_VERSION}"/ublue-os-staging-fedora-"${FEDORA_MAJOR_VERSION}".repo?arch=x86_64 && \
     curl -Lo /etc/yum.repos.d/_copr_kylegospo-latencyflex.repo https://copr.fedorainfracloud.org/coprs/kylegospo/LatencyFleX/repo/fedora-"${FEDORA_MAJOR_VERSION}"/kylegospo-LatencyFleX-fedora-"${FEDORA_MAJOR_VERSION}".repo && \
     curl -Lo /etc/yum.repos.d/_copr_kylegospo-obs-vkcapture.repo https://copr.fedorainfracloud.org/coprs/kylegospo/obs-vkcapture/repo/fedora-"${FEDORA_MAJOR_VERSION}"/kylegospo-obs-vkcapture-fedora-"${FEDORA_MAJOR_VERSION}".repo?arch=x86_64 && \
@@ -167,6 +173,8 @@ RUN rpm-ostree cliwrap install-to-root / && \
     ; else \
         echo "will use kernel from ${KERNEL_FLAVOR} images" \
     ; fi && \
+    rpm-ostree install \
+        scx_lavd && \
     ostree container commit
 
 # Setup firmware
@@ -317,6 +325,7 @@ RUN rpm-ostree install \
         xwiimote-ng \
         twitter-twemoji-fonts \
         google-noto-sans-cjk-fonts \
+        wqy-zenhei-fonts \
         lato-fonts \
         fira-code-fonts \
         nerd-fonts \
@@ -365,7 +374,7 @@ RUN rpm-ostree install \
         libXinerama.i686 \
         libXtst.i686 \
         libXScrnSaver.i686 \
-        NetworkManager-libnm.i686 \
+        https://kojipkgs.fedoraproject.org//packages/NetworkManager/1.46.0/2.fc40/i686/NetworkManager-libnm-1.46.0-2.fc40.i686.rpm \
         nss.i686 \
         pulseaudio-libs.i686 \
         libcurl.i686 \
@@ -412,9 +421,6 @@ RUN rpm-ostree install \
         libobs_glcapture.i686 \
         mangohud.x86_64 \
         mangohud.i686 && \
-    ln -s wine32 /usr/bin/wine && \
-    ln -s wine32-preloader /usr/bin/wine-preloader && \
-    ln -s wineserver64 /usr/bin/wineserver && \
     sed -i 's@\[Desktop Entry\]@\[Desktop Entry\]\nNoDisplay=true@g' /usr/share/applications/winetricks.desktop && \
     curl -Lo /tmp/latencyflex.tar.xz $(curl https://api.github.com/repos/ishitatsuyuki/LatencyFleX/releases/latest | jq -r '.assets[] | select(.name| test(".*.tar.xz$")).browser_download_url') && \
     mkdir -p /tmp/latencyflex && \
@@ -571,6 +577,7 @@ RUN rm -f /etc/profile.d/toolbox.sh && \
     sed -i 's@enabled=1@enabled=0@g' /etc/yum.repos.d/_copr_ublue-os-akmods.repo && \
     sed -i 's@enabled=1@enabled=0@g' /etc/yum.repos.d/_copr_kylegospo-bazzite.repo && \
     sed -i 's@enabled=1@enabled=0@g' /etc/yum.repos.d/_copr_kylegospo-bazzite-multilib.repo && \
+    sed -i 's@enabled=1@enabled=0@g' /etc/yum.repos.d/_copr_kylegospo-scx_lavd.repo && \
     sed -i 's@enabled=1@enabled=0@g' /etc/yum.repos.d/_copr_ublue-os-staging.repo && \
     sed -i 's@enabled=1@enabled=0@g' /etc/yum.repos.d/_copr_kylegospo-latencyflex.repo && \
     sed -i 's@enabled=1@enabled=0@g' /etc/yum.repos.d/_copr_kylegospo-obs-vkcapture.repo && \
@@ -613,11 +620,25 @@ RUN rm -f /etc/profile.d/toolbox.sh && \
     systemctl --global enable podman.socket && \
     systemctl --global enable systemd-tmpfiles-setup.service && \
     if grep -q "kinoite" <<< "${BASE_IMAGE_NAME}"; then \
-        sed -i '/^PRETTY_NAME/s/Kinoite/Bazzite/' /usr/lib/os-release \
+        sed -i '/^PRETTY_NAME/s/Kinoite/From Fedora Kinoite/' /usr/lib/os-release \
     ; else \
         sed -i 's@\[Desktop Entry\]@\[Desktop Entry\]\nNoDisplay=true@g' /usr/share/applications/yad-icon-browser.desktop && \
-        sed -i '/^PRETTY_NAME/s/Silverblue/Bazzite GNOME/' /usr/lib/os-release \
+        sed -i '/^PRETTY_NAME/s/Silverblue/From Fedora Silverblue/' /usr/lib/os-release \
     ; fi && \
+    sed -i '/^PRETTY_NAME/s/Fedora Linux/Bazzite/' /usr/lib/os-release &&\
+    sed -i 's/^NAME=.*/NAME="Bazzite"/' /usr/lib/os-release && \
+    sed -i 's|^HOME_URL=.*|HOME_URL="https://bazzite.gg"|' /usr/lib/os-release && \
+    sed -i 's|^DOCUMENTATION_URL=.*|DOCUMENTATION_URL="https://docs.bazzite.gg"|' /usr/lib/os-release && \
+    sed -i 's|^SUPPORT_URL=.*|SUPPORT_URL="https://discord.bazzite.gg"|' /usr/lib/os-release && \
+    sed -i 's|^BUG_REPORT_URL=.*|BUG_REPORT_URL="https://github.com/ublue-os/bazzite/issues/"|' /usr/lib/os-release && \
+    sed -i 's|^CPE_NAME="cpe:/o:fedoraproject:fedora|CPE_NAME="cpe:/o:universal-blue:bazzite|' /usr/lib/os-release && \
+    sed -i 's/^DEFAULT_HOSTNAME=.*/DEFAULT_HOSTNAME="bazzite"/' /usr/lib/os-release && \
+    sed -i 's/^ID=.*/ID=bazzite\nID_LIKE="rhel centos fedora"/' /usr/lib/os-release && \
+    sed -i 's/^LOGO=.*/LOGO=bazzite-logo-icon/' /usr/lib/os-release && \
+    sed -i 's/^ANSI_COLOR=.*/ANSI_COLOR="0;38;2;138;43;226"/' /usr/lib/os-release && \
+    sed -i '/^REDHAT_BUGZILLA_PRODUCT=/d; /^REDHAT_BUGZILLA_PRODUCT_VERSION=/d; /^REDHAT_SUPPORT_PRODUCT=/d; /^REDHAT_SUPPORT_PRODUCT_VERSION=/d' /usr/lib/os-release && \
+    echo "VERSION_CODENAME=\"$CODE_NAME\"" >> /usr/lib/os-release && \
+    echo "BUILD_ID=\"$SHA_HEAD_SHORT\"" >> /usr/lib/os-release && \
     systemctl disable waydroid-container.service && \
     curl -Lo /usr/etc/dxvk-example.conf https://raw.githubusercontent.com/doitsujin/dxvk/master/dxvk.conf && \
     curl -Lo /usr/bin/waydroid-choose-gpu https://raw.githubusercontent.com/KyleGospo/waydroid-scripts/main/waydroid-choose-gpu.sh && \
@@ -767,7 +788,7 @@ RUN /usr/libexec/containerbuild/image-info && \
     systemctl disable batterylimit.service && \
     ostree container commit
 
-FROM ghcr.io/ublue-os/akmods-nvidia:${KERNEL_FLAVOR}-${FEDORA_MAJOR_VERSION} AS nvidia-akmods
+FROM ghcr.io/ublue-os/akmods-nvidia:${KERNEL_FLAVOR}-${FEDORA_MAJOR_VERSION}-20240716 AS nvidia-akmods
 
 FROM bazzite AS bazzite-nvidia
 
@@ -800,6 +821,7 @@ RUN curl -Lo /tmp/nvidia-install.sh https://raw.githubusercontent.com/ublue-os/h
     chmod +x /tmp/nvidia-install.sh && \
     IMAGE_NAME="${BASE_IMAGE_NAME}" /tmp/nvidia-install.sh && \
     rm -f /usr/share/vulkan/icd.d/nouveau_icd.*.json && \
+    ln -s libnvidia-ml.so.1 /usr/lib64/libnvidia-ml.so && \
     ostree container commit
 
 # Cleanup & Finalize
