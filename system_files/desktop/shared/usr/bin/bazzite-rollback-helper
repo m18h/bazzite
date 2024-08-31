@@ -26,9 +26,11 @@ Examples:
   bazzite-rollback-helper list stable
   bazzite-rollback-helper rollback
   bazzite-rollback-helper current
-  bazzite-rollback-helper rebase bazzite-deck:39-20240315
+  bazzite-rollback-helper rebase 40-stable-20240722
+  bazzite-rollback-helper rebase bazzite-deck:40-stable-20240722
   bazzite-rollback-helper rebase bazzite-deck:stable
   bazzite-rollback-helper rebase stable
+  bazzite-rollback-helper rebase testing
 
 For more help, visit https://discord.bazzite.gg.
 
@@ -39,14 +41,15 @@ EOF
 if [[ "$1" == "list" ]]; then
   if [ -z "$2" ]; then
       echo "Listing images for $DEFAULT_BRANCH"
-      skopeo list-tags docker://ghcr.io/ublue-os/bazzite | grep -- "-$DEFAULT_BRANCH-" | sort -rV
+      skopeo list-tags docker://ghcr.io/ublue-os/bazzite | grep -E "\"$DEFAULT_BRANCH-[0-9]+\.[0-9]+|-$DEFAULT_BRANCH-[0-9]+" | sort -rV
   else
       echo "Listing images for $2"
-      skopeo list-tags docker://ghcr.io/ublue-os/bazzite | grep -- "-$2-" | sort -rV
+      skopeo list-tags docker://ghcr.io/ublue-os/bazzite | grep -E "\"$2-[0-9]+\.[0-9]+|-$2-[0-9]+" | sort -rV
   fi
 
 elif [[ "$1" == "rollback" ]]; then
   rpm-ostree rollback
+  echo "Reboot for changes to take effect"
 
 elif [[ "$1" == "current" ]]; then
   # current image
@@ -76,7 +79,7 @@ EOF
 )
   read -p "$question" yn
   case $yn in
-      [Yy]) echo "rebasing to $rebase_target" && rpm-ostree rebase $full_image_path;;
+      [Yy]) echo "rebasing to $rebase_target" && rpm-ostree rebase $full_image_path &&  echo "Reboot for changes to take effect";;
       *) echo "Unknown option, exiting.";;
   esac
 
