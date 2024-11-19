@@ -200,8 +200,6 @@ RUN --mount=type=cache,dst=/var/cache/rpm-ostree \
 
 # Setup Copr repos
 RUN --mount=type=cache,dst=/var/cache/rpm-ostree \
-    curl -Lo /usr/bin/copr https://raw.githubusercontent.com/ublue-os/COPR-command/main/copr && \
-    chmod +x /usr/bin/copr && \
     curl -Lo /etc/yum.repos.d/_copr_kylegospo-bazzite.repo https://copr.fedorainfracloud.org/coprs/kylegospo/bazzite/repo/fedora-"${FEDORA_MAJOR_VERSION}"/kylegospo-bazzite-fedora-"${FEDORA_MAJOR_VERSION}".repo && \
     curl -Lo /etc/yum.repos.d/_copr_kylegospo-bazzite-multilib.repo https://copr.fedorainfracloud.org/coprs/kylegospo/bazzite-multilib/repo/fedora-"${FEDORA_MAJOR_VERSION}"/kylegospo-bazzite-multilib-fedora-"${FEDORA_MAJOR_VERSION}".repo?arch=x86_64 && \
     curl -Lo /etc/yum.repos.d/_copr_ublue-os-staging.repo https://copr.fedorainfracloud.org/coprs/ublue-os/staging/repo/fedora-"${FEDORA_MAJOR_VERSION}"/ublue-os-staging-fedora-"${FEDORA_MAJOR_VERSION}".repo?arch=x86_64 && \
@@ -220,6 +218,7 @@ RUN --mount=type=cache,dst=/var/cache/rpm-ostree \
     curl -Lo /etc/yum.repos.d/_copr_rok-cdemu.repo https://copr.fedorainfracloud.org/coprs/rok/cdemu/repo/fedora-"${FEDORA_MAJOR_VERSION}"/rok-cdemu-fedora-"${FEDORA_MAJOR_VERSION}".rep && \
     curl -Lo /etc/yum.repos.d/_copr_rodoma92-kde-cdemu-manager.repo https://copr.fedorainfracloud.org/coprs/rodoma92/kde-cdemu-manager/repo/fedora-"${FEDORA_MAJOR_VERSION}"/rodoma92-kde-cdemu-manager-fedora-"${FEDORA_MAJOR_VERSION}".repo && \
     curl -Lo /etc/yum.repos.d/_copr_rodoma92-rmlint.repo https://copr.fedorainfracloud.org/coprs/rodoma92/rmlint/repo/fedora-"${FEDORA_MAJOR_VERSION}"/rodoma92-rmlint-fedora-"${FEDORA_MAJOR_VERSION}".repo && \
+    curl -Lo /etc/yum.repos.d/_copr_ilyaz-lact.repo https://copr.fedorainfracloud.org/coprs/ilyaz/LACT/repo/fedora-"${FEDORA_MAJOR_VERSION}"/ilyaz-LACT-fedora-"${FEDORA_MAJOR_VERSION}".repo && \
     curl -Lo /etc/yum.repos.d/tailscale.repo https://pkgs.tailscale.com/stable/fedora/tailscale.repo && \
     rpm-ostree install \
         https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
@@ -306,6 +305,7 @@ RUN --mount=type=cache,dst=/var/cache/rpm-ostree \
         /tmp/akmods-rpms/kmods/*openrazer*.rpm \
         /tmp/akmods-rpms/kmods/*v4l2loopback*.rpm \
         /tmp/akmods-rpms/kmods/*wl*.rpm \
+        /tmp/akmods-rpms/kmods/*framework-laptop*.rpm \
         /tmp/akmods-extra-rpms/kmods/*gcadapter_oc*.rpm \
         /tmp/akmods-extra-rpms/kmods/*nct6687*.rpm \
         /tmp/akmods-extra-rpms/kmods/*zenergy*.rpm \
@@ -313,7 +313,8 @@ RUN --mount=type=cache,dst=/var/cache/rpm-ostree \
         /tmp/akmods-extra-rpms/kmods/*ayaneo-platform*.rpm \
         /tmp/akmods-extra-rpms/kmods/*ayn-platform*.rpm \
         /tmp/akmods-extra-rpms/kmods/*bmi260*.rpm \
-        /tmp/akmods-extra-rpms/kmods/*ryzen-smu*.rpm && \
+        /tmp/akmods-extra-rpms/kmods/*ryzen-smu*.rpm \
+        /tmp/akmods-extra-rpms/kmods/*evdi*.rpm && \
     rpm-ostree override replace \
         --experimental \
         --from repo=copr:copr.fedorainfracloud.org:ublue-os:staging \
@@ -325,9 +326,24 @@ RUN --mount=type=cache,dst=/var/cache/rpm-ostree \
     /usr/libexec/containerbuild/cleanup.sh && \
     ostree container commit
 
-# Install Valve's patched Mesa, Pipewire, Bluez, and Xwayland
+# Install Valve's patched Mesa, Pipewire, Bluez, and Xwayland#
 # Install patched switcheroo control with proper discrete GPU support
+# Tempporary fix for GPU Encoding
 RUN --mount=type=cache,dst=/var/cache/rpm-ostree \
+    rpm-ostree install \
+        mesa-dri-drivers.i686 && \
+    mkdir -p /tmp/mesa-fix64/dri && \
+    cp /usr/lib64/libgallium-*.so /tmp/mesa-fix64/ && \
+    cp /usr/lib64/dri/kms_swrast_dri.so /tmp/mesa-fix64/dri/ && \
+    cp /usr/lib64/dri/libdril_dri.so /tmp/mesa-fix64/dri/ && \
+    cp /usr/lib64/dri/swrast_dri.so /tmp/mesa-fix64/dri/ && \
+    cp /usr/lib64/dri/virtio_gpu_dri.so /tmp/mesa-fix64/dri/ && \
+    mkdir -p /tmp/mesa-fix32/dri && \
+    cp /usr/lib/libgallium-*.so /tmp/mesa-fix32/ && \
+    cp /usr/lib/dri/kms_swrast_dri.so /tmp/mesa-fix32/dri/ && \
+    cp /usr/lib/dri/libdril_dri.so /tmp/mesa-fix32/dri/ && \
+    cp /usr/lib/dri/swrast_dri.so /tmp/mesa-fix32/dri/ && \
+    cp /usr/lib/dri/virtio_gpu_dri.so /tmp/mesa-fix32/dri/ && \
     rpm-ostree override replace \
     --experimental \
     --from repo=copr:copr.fedorainfracloud.org:kylegospo:bazzite-multilib \
@@ -352,6 +368,10 @@ RUN --mount=type=cache,dst=/var/cache/rpm-ostree \
         bluez-cups \
         bluez-libs \
         xorg-x11-server-Xwayland && \
+    rsync -a /tmp/mesa-fix64/ /usr/lib64/ && \
+    rsync -a /tmp/mesa-fix32/ /usr/lib/ && \
+    rm -rf /tmp/mesa-fix64 && \
+    rm -rf /tmp/mesa-fix32 && \
     sed -i 's@enabled=0@enabled=1@g' /etc/yum.repos.d/rpmfusion-*.repo && \
     rpm-ostree install \
         libaacs \
@@ -588,7 +608,6 @@ RUN --mount=type=cache,dst=/var/cache/rpm-ostree \
             ibus-mozc \
             openssh-askpass && \
         rpm-ostree override remove \
-            gnome-software-rpm-ostree \
             gnome-classic-session \
             gnome-tour \
             gnome-extensions-app \
@@ -677,8 +696,10 @@ RUN rm -f /etc/profile.d/toolbox.sh && \
     echo "import \"/usr/share/ublue-os/just/83-bazzite-audio.just\"" >> /usr/share/ublue-os/justfile && \
     echo "import \"/usr/share/ublue-os/just/84-bazzite-virt.just\"" >> /usr/share/ublue-os/justfile && \
     echo "import \"/usr/share/ublue-os/just/85-bazzite-image.just\"" >> /usr/share/ublue-os/justfile && \
+    echo "import \"/usr/share/ublue-os/just/86-bazzite-windows.just\"" >> /usr/share/ublue-os/justfile && \
     echo "import \"/usr/share/ublue-os/just/90-bazzite-de.just\"" >> /usr/share/ublue-os/justfile && \
     if grep -q "kinoite" <<< "${BASE_IMAGE_NAME}"; then \
+      systemctl enable usr-share-sddm-themes.mount && \
       mkdir -p "/usr/share/ublue-os/dconfs/desktop-kinoite/" && \
       cp "/usr/share/glib-2.0/schemas/zz0-"*"-bazzite-desktop-kinoite-"*".gschema.override" "/usr/share/ublue-os/dconfs/desktop-kinoite/" && \
       find "/etc/dconf/db/distro.d/" -maxdepth 1 -type f -exec cp {} "/usr/share/ublue-os/dconfs/desktop-kinoite/" \; && \
@@ -729,6 +750,7 @@ RUN rm -f /etc/profile.d/toolbox.sh && \
     systemctl disable brew-upgrade.timer && \
     systemctl disable brew-update.timer && \
     systemctl enable btrfs-dedup@var-home.timer && \
+    systemctl disable displaylink.service && \
     systemctl enable input-remapper.service && \
     systemctl unmask bazzite-flatpak-manager.service && \
     systemctl enable bazzite-flatpak-manager.service && \
@@ -888,6 +910,8 @@ RUN /usr/libexec/containerbuild/image-info && \
       find "/etc/dconf/db/distro.d/" -maxdepth 1 -type f -exec cp {} "/usr/share/ublue-os/dconfs/deck-silverblue/" \; && \
       dconf-override-converter to-dconf "/usr/share/ublue-os/dconfs/deck-silverblue/zz0-"*"-bazzite-deck-silverblue-"*".gschema.override" && \
       rm "/usr/share/ublue-os/dconfs/deck-silverblue/zz0-"*"-bazzite-deck-silverblue-"*".gschema.override" \
+    ; else \
+      systemctl disable usr-share-sddm-themes.mount \
     ; fi && \
     mkdir -p /tmp/bazzite-schema-test && \
     find "/usr/share/glib-2.0/schemas/" -type f ! -name "*.gschema.override" -exec cp {} "/tmp/bazzite-schema-test/" \; && \
